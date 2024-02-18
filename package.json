@@ -1,0 +1,17 @@
+{
+  "name": "discord-ai-bot",
+  "version": "1.0.0",
+  "description": "A simple Discord bot created with Discord.js",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "author": "Nandan",
+  "dependencies": {
+    "discord.js": "^13.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
