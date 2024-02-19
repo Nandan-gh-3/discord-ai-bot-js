@@ -3,9 +3,18 @@
 module.exports = {
     name: 'say',
     description: 'Says something!',
-    execute(message, args) {
+    async execute(message, args) {
         const sayMessage = args.join(' ');
-        message.delete(); // asynchronus
-        message.channel.send(sayMessage); // asynchronus
+
+        try {
+            // Attempt to delete the original message and send the new message
+            await Promise.all([
+                message.delete(),
+                message.channel.send(sayMessage)
+            ]);
+        } catch (error) {
+            console.error('Error:', error);
+            // Log any errors that occur during message deletion or sending
+        }
     },
 };

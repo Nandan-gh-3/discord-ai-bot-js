@@ -1,7 +1,7 @@
 // index.js
 
 const { Client, Intents } = require('discord.js');
-const { prefix, token } = require('./config/config.json');
+const { discordToken } = require('./config/config.json');
 const { loadCommands, loadEvents } = require('./utils/loader');
 
 // Create a new Discord client
@@ -27,7 +27,7 @@ const client = new Client({
         await loadEvents(client);
 
         // Login to Discord
-        await client.login(token);
+        await client.login(discordToken);
         console.log('Bot logged in successfully.');
     } catch (error) {
         console.error('Error initializing bot:', error);

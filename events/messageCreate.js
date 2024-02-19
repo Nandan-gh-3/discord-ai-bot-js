@@ -2,6 +2,8 @@
 
 const c = require('../utils/colorUtils');
 const { prefix } = require('../config/config.json');
+const { generateContent } = require('../utils/gemini/geminiUtils');
+const { send, fetchEmojis } = require('../utils/helperUtils');
 
 // Function to handle incoming messages
 async function handleMessage(message) {
@@ -24,7 +26,7 @@ async function handleMessage(message) {
 }
 
 // Function to handle messages that are commands
-async function handleCommandMessage(message) {
+async function handleCommandMessage(message, client) {
     // Parse command and arguments
     const args = message.content.slice(prefix.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
@@ -41,17 +43,81 @@ async function handleCommandMessage(message) {
     }
 }
 
+// Function to replace mentions with their corresponding names
+async function replaceMentions(message, content) {
+    const rolesRegex = /<@&(\d+)>/g;
+    const usersRegex = /<@!?(\d+)>/g;
+
+    const replaceRoleMentions = async (content) => {
+        const roleMentions = content.match(rolesRegex);
+        if (roleMentions) {
+            for (const mention of roleMentions) {
+                const roleId = mention.match(/\d+/)[0];
+                const role = message.guild.roles.cache.get(roleId);
+                if (role) {
+                    content = content.replace(mention, `@${role.name}`);
+                }
+            }
+        }
+        return content;
+    };
+
+    const replaceUserMentions = async (content) => {
+        const userMentions = content.match(usersRegex);
+        if (userMentions) {
+            for (const mention of userMentions) {
+                const userId = mention.match(/\d+/)[0];
+                const userObject = await message.client.users.fetch(userId);
+                if (userObject) {
+                    content = content.replace(mention, `@${userObject.username}`);
+                }
+            }
+        }
+        return content;
+    };
+
+    content = await replaceRoleMentions(content);
+    content = await replaceUserMentions(content);
+
+    return content;
+}
+
 // Function to handle messages where the bot is mentioned
 async function handleMentionMessage(message) {
     try {
         // Send typing indicator
         await message.channel.sendTyping();
-        // Send a greeting message
-        await message.channel.send('Hello! How can I assist you?');
+
+        // Generate content using Gemini AI
+        const user = message.author.username;
+        let prompt = message.content; // Change const to let for reassignment
+
+        // Replace mentions with their corresponding names
+        prompt = await replaceMentions(message, prompt);
+
+        // Fetch the last 12 messages from the channel
+        const messages = await message.channel.messages.fetch({ limit: 12 });
+
+        // Extract the text content of each message, ensuring mentions are replaced with usernames and role names
+        let history = await Promise.all(messages.map(async msg => ({
+            text: `${msg.author.username == "MONKE" ? 'output' : msg.author.globalName}:${await replaceMentions(message, msg.content)}`
+        })));
+        history = history.reverse();
+
+        const emojis = fetchEmojis(message.guild); // Fetch emojis in the guild
+        const generatedResponse = await generateContent(user, prompt, emojis, history);
+
+        // Send the generated response
+        await send(message.channel, generatedResponse);
     } catch (error) {
-        console.error('Error while sending typing indicator or greeting message:', error);
+        console.error('Error while generating or sending response:', error);
     }
 }
+
+
+
+
+
 
 // Exporting the messageCreate event handler
 module.exports = {
