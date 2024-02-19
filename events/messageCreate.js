@@ -3,7 +3,7 @@
 const c = require('../utils/colorUtils');
 const { prefix } = require('../config/config.json');
 const { generateContent } = require('../utils/gemini/geminiUtils');
-const { send, fetchEmojis } = require('../utils/helperUtils');
+const { send, fetchEmojis, replaceMentions } = require('../utils/helperUtils');
 
 // Function to handle incoming messages
 async function handleMessage(message) {
@@ -12,8 +12,22 @@ async function handleMessage(message) {
 
     // Define handlers for different conditions
     const handlers = new Map([
-        [message.content.startsWith(prefix), handleCommandMessage], // Check if the message starts with the prefix
-        [message.mentions.has(message.client.user), handleMentionMessage] // Check if the bot is mentioned
+        // Check if the message starts with the prefix
+        [message.content.startsWith(prefix), handleCommandMessage],
+
+        // Check if the bot is mentioned and not replied to
+        [message.mentions.has(message.client.user) && !message.reference, handleMentionMessage],
+
+        // Check if the message is a reply from a bot and matches the bot client
+        [message.reference && message.reference.messageId && (await (async () => {
+            try {
+                const referencedMessage = await message.channel.messages.fetch(message.reference.messageId);
+                return referencedMessage.author.bot && referencedMessage.author.id === message.client.user.id;
+            } catch (error) {
+                console.error('Error fetching referenced message:', error);
+                return false;
+            }
+        })()), handleReplyMessage]
     ]);
 
     // Iterate over each entry in the map and execute the handler for the first condition that evaluates to true
@@ -25,8 +39,11 @@ async function handleMessage(message) {
     }
 }
 
+
+
 // Function to handle messages that are commands
 async function handleCommandMessage(message, client) {
+    console.log("handling command");
     // Parse command and arguments
     const args = message.content.slice(prefix.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
@@ -43,47 +60,9 @@ async function handleCommandMessage(message, client) {
     }
 }
 
-// Function to replace mentions with their corresponding names
-async function replaceMentions(message, content) {
-    const rolesRegex = /<@&(\d+)>/g;
-    const usersRegex = /<@!?(\d+)>/g;
-
-    const replaceRoleMentions = async (content) => {
-        const roleMentions = content.match(rolesRegex);
-        if (roleMentions) {
-            for (const mention of roleMentions) {
-                const roleId = mention.match(/\d+/)[0];
-                const role = message.guild.roles.cache.get(roleId);
-                if (role) {
-                    content = content.replace(mention, `@${role.name}`);
-                }
-            }
-        }
-        return content;
-    };
-
-    const replaceUserMentions = async (content) => {
-        const userMentions = content.match(usersRegex);
-        if (userMentions) {
-            for (const mention of userMentions) {
-                const userId = mention.match(/\d+/)[0];
-                const userObject = await message.client.users.fetch(userId);
-                if (userObject) {
-                    content = content.replace(mention, `@${userObject.username}`);
-                }
-            }
-        }
-        return content;
-    };
-
-    content = await replaceRoleMentions(content);
-    content = await replaceUserMentions(content);
-
-    return content;
-}
-
 // Function to handle messages where the bot is mentioned
 async function handleMentionMessage(message) {
+    console.log("handling mention");
     try {
         // Send typing indicator
         await message.channel.sendTyping();
@@ -106,12 +85,28 @@ async function handleMentionMessage(message) {
 
         const emojis = fetchEmojis(message.guild); // Fetch emojis in the guild
         const generatedResponse = await generateContent(user, prompt, emojis);
-
+        console.log(generatedResponse);
         // Send the generated response
         await send(message.channel, generatedResponse);
     } catch (error) {
         console.error('Error while generating or sending response:', error);
     }
+}
+
+async function handleReplyMessage(message) {
+    console.log("handling reply");
+    let referencedMessageContent = '';
+    if (message.reference && message.reference.messageID) {
+        try {
+            const referencedMessage = await message.channel.messages.fetch(message.reference.messageID);
+            referencedMessageContent = referencedMessage.content || '';
+        } catch (error) {
+            console.error('Error fetching referenced message:', error);
+        }
+    }
+
+    const generatedResponse = await generateContent(message.author.username, `${referencedMessageContent}\n${message.content}`);
+    await send(message.channel, generatedResponse);
 }
 
 

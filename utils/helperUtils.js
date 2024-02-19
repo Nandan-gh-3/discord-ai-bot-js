@@ -36,5 +36,43 @@ async function send(channel, messageContent) {
         await channel.send(chunk);
     }
 }
+// Function to replace mentions with their corresponding names
+async function replaceMentions(message, content) {
+    const rolesRegex = /<@&(\d+)>/g;
+    const usersRegex = /<@!?(\d+)>/g;
 
-module.exports = { fetchEmojis, send };
+    const replaceRoleMentions = async (content) => {
+        const roleMentions = content.match(rolesRegex);
+        if (roleMentions) {
+            for (const mention of roleMentions) {
+                const roleId = mention.match(/\d+/)[0];
+                const role = message.guild.roles.cache.get(roleId);
+                if (role) {
+                    content = content.replace(mention, `@${role.name}`);
+                }
+            }
+        }
+        return content;
+    };
+
+    const replaceUserMentions = async (content) => {
+        const userMentions = content.match(usersRegex);
+        if (userMentions) {
+            for (const mention of userMentions) {
+                const userId = mention.match(/\d+/)[0];
+                const userObject = await message.client.users.fetch(userId);
+                if (userObject) {
+                    content = content.replace(mention, `@${userObject.username}`);
+                }
+            }
+        }
+        return content;
+    };
+
+    content = await replaceRoleMentions(content);
+    content = await replaceUserMentions(content);
+
+    return content;
+}
+
+module.exports = { fetchEmojis, send, replaceMentions };
