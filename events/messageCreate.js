@@ -105,7 +105,7 @@ async function handleMentionMessage(message) {
         history = history.reverse();
 
         const emojis = fetchEmojis(message.guild); // Fetch emojis in the guild
-        const generatedResponse = await generateContent(user, prompt, emojis, history);
+        const generatedResponse = await generateContent(user, prompt, emojis);
 
         // Send the generated response
         await send(message.channel, generatedResponse);
