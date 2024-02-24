@@ -74,10 +74,16 @@ async function handleMentionMessage(ctx) {
 
         // emojis
         const emojis = fetchEmojis(ctx.guild);
+
+        // format the prompt according to history
         if(history){
             prompt = `--- start of conversation ---\n${history}\n--- end of conversation ---\n\nQuery - ${prompt}\n Respond to this query in 1 to 3 short sentences. Take any context if needed from the above conversation. Do not repeat anything as it is from the conversation. Use monke slang. Do not separate answer in points. Your name is MONKE in this conversation.`;
         }
 
+        //format the prompt if there is no history
+        if(!history){
+            prompt = `${prompt}\n Respond to this query in short. Do not repeat anything. Use monke slang. Do not separate answer in points.`
+        }
 
         console.log("\nprompt\n", prompt);
         const generatedResponse = await generateFreeform(prompt);
