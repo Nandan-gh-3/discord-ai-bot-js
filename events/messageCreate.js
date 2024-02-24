@@ -2,8 +2,9 @@
 
 const c = require('../utils/colorUtils');
 const { prefix } = require('../config/config.json');
-const { generateContent } = require('../utils/gemini/geminiUtils');
-const { send, fetchEmojis, replaceMentions } = require('../utils/helperUtils');
+const { generateStructured, generateFreeform } = require('../utils/gemini/geminiUtils');
+const { send, reply, fetchEmojis, formatMentions } = require('../utils/helperUtils');
+const fs = require('fs');
 
 // Function to handle incoming messages
 async function handleMessage(message) {
@@ -11,35 +12,24 @@ async function handleMessage(message) {
     if (message.author.bot) return;
 
     // Define handlers for different conditions
-    const handlers = new Map([
-        // Check if the message starts with the prefix
-        [message.content.startsWith(prefix), handleCommandMessage],
+    if (message.content.toLowerCase().startsWith(prefix)) {
+        await handleCommandMessage(message);
+        return;
+    }
 
-        // Check if the bot is mentioned and not replied to
-        [message.mentions.has(message.client.user) && !message.reference, handleMentionMessage],
+    if (message.mentions.has(message.client.user) && !message.reference) {
+        await handleMentionMessage(message);
+        return;
+    }
 
-        // Check if the message is a reply from a bot and matches the bot client
-        [message.reference && message.reference.messageId && (await (async () => {
-            try {
-                const referencedMessage = await message.channel.messages.fetch(message.reference.messageId);
-                return referencedMessage.author.bot && referencedMessage.author.id === message.client.user.id;
-            } catch (error) {
-                console.error('Error fetching referenced message:', error);
-                return false;
-            }
-        })()), handleReplyMessage]
-    ]);
-
-    // Iterate over each entry in the map and execute the handler for the first condition that evaluates to true
-    for (const [condition, handler] of handlers) {
-        if (condition) {
-            await handler(message); // Execute the handler
-            break; // Exit loop after handling the first condition
+    if (message.reference && message.reference.messageId) {
+        const referencedMessage = await message.channel.messages.fetch(message.reference.messageId);
+        if (referencedMessage.author.bot && referencedMessage.author.id === message.client.user.id) {
+            await handleReplyMessage(message);
+            return;
         }
     }
 }
-
-
 
 // Function to handle messages that are commands
 async function handleCommandMessage(message, client) {
@@ -61,33 +51,38 @@ async function handleCommandMessage(message, client) {
 }
 
 // Function to handle messages where the bot is mentioned
-async function handleMentionMessage(message) {
-    console.log("handling mention");
+async function handleMentionMessage(ctx) {
     try {
-        // Send typing indicator
-        await message.channel.sendTyping();
+        await ctx.channel.sendTyping();
 
-        // Generate content using Gemini AI
-        const user = message.author.username;
-        let prompt = message.content; // Change const to let for reassignment
+        // sender
+        const sender = ctx.author.username;
 
-        // Replace mentions with their corresponding names
-        prompt = await replaceMentions(message, prompt);
+        // prompt
+        let prompt = await formatMentions(ctx);
 
-        // Fetch the last 12 messages from the channel
-        const messages = await message.channel.messages.fetch({ limit: 12 });
+        // history
+        const historyLimit = JSON.parse(fs.readFileSync('data.json').toString()).historyLimit || {};
+        let history
+        if (historyLimit[ctx.guild.id]) {
+            const messages = await ctx.channel.messages.fetch({ limit: historyLimit[ctx.guild.id]+1 });
+            history = (await Promise.all(messages.map(async msg => (
+                // (msg.author.globalName || msg.author.username) + " : " + await formatMentions(msg)
+                (msg.author.username) + " : " + await formatMentions(msg)
+            )))).reverse().slice(0, -1).join('\n');
+        }
 
-        // Extract the text content of each message, ensuring mentions are replaced with usernames and role names
-        let history = await Promise.all(messages.map(async msg => ({
-            text: `${msg.author.username == "MONKE" ? 'output' : msg.author.globalName}:${await replaceMentions(message, msg.content)}`
-        })));
-        history = history.reverse();
+        // emojis
+        const emojis = fetchEmojis(ctx.guild);
+        if(history){
+            prompt = `--- start of conversation ---\n${history}\n--- end of conversation ---\n\nQuery - ${prompt}\n Respond to this query in 1 to 3 short sentences. Take any context if needed from the above conversation. Do not repeat anything as it is from the conversation. Use monke slang. Do not separate answer in points. Your name is MONKE in this conversation.`;
+        }
 
-        const emojis = fetchEmojis(message.guild); // Fetch emojis in the guild
-        const generatedResponse = await generateContent(user, prompt, emojis);
-        console.log(generatedResponse);
+
+        console.log("\nprompt\n", prompt);
+        const generatedResponse = await generateFreeform(prompt);
         // Send the generated response
-        await send(message.channel, generatedResponse);
+        await reply(ctx, generatedResponse);
     } catch (error) {
         console.error('Error while generating or sending response:', error);
     }
@@ -98,20 +93,18 @@ async function handleReplyMessage(message) {
     let referencedMessageContent = '';
     if (message.reference && message.reference.messageID) {
         try {
-            const referencedMessage = await message.channel.messages.fetch(message.reference.messageID);
+            const [referencedMessage, generatedResponse] = await Promise.all([
+                message.channel.messages.fetch(message.reference.messageID),
+                generateStructured(message.author.username, `${referencedMessageContent}\n${message.content}`)
+            ]);
             referencedMessageContent = referencedMessage.content || '';
+            await send(message.channel, generatedResponse);
         } catch (error) {
-            console.error('Error fetching referenced message:', error);
+            console.error('Error handling reply:', error);
+            // Handle specific errors and retries if necessary
         }
     }
-
-    const generatedResponse = await generateContent(message.author.username, `${referencedMessageContent}\n${message.content}`);
-    await send(message.channel, generatedResponse);
 }
-
-
-
-
 
 
 // Exporting the messageCreate event handler

@@ -22,9 +22,15 @@ const client = new Client({
 // Asynchronous function to initialize the bot
 (async () => {
     try {
-        // Load commands and events
-        await loadCommands(client);
-        await loadEvents(client);
+        // Load commands if not already loaded
+        if (!module.exports.commands) {
+            module.exports.commands = await loadCommands(client);
+        }
+
+        // Load events if not already loaded
+        if (!module.exports.events) {
+            module.exports.events = await loadEvents(client);
+        }
 
         // Login to Discord
         await client.login(discordToken);
