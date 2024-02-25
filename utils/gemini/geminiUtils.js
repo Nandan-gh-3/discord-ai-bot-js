@@ -29,6 +29,7 @@ async function generateStructured(user, prompt, emojis, history) {
 }
 
 async function generateFreeform(prompt) {
+    console.log("\n\n",prompt ,"\n\n");
     const parts = [{ text: prompt }];
     const result = await model.generateContent({ contents: [{ role: "user", parts }], generationConfig, safetySettings });
     return result.response.text();

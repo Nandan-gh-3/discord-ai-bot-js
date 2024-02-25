@@ -1,5 +1,6 @@
 // events/ready.js
 const c = require('../utils/colorUtils');
+const fs = require('fs');
 
 module.exports = {
     name: 'ready',

@@ -96,22 +96,19 @@ async function handleMentionMessage(ctx) {
 
 async function handleReplyMessage(message) {
     console.log("handling reply");
-    let referencedMessageContent = '';
-    if (message.reference && message.reference.messageID) {
-        try {
-            const [referencedMessage, generatedResponse] = await Promise.all([
-                message.channel.messages.fetch(message.reference.messageID),
-                generateStructured(message.author.username, `${referencedMessageContent}\n${message.content}`)
-            ]);
-            referencedMessageContent = referencedMessage.content || '';
-            await send(message.channel, generatedResponse);
-        } catch (error) {
-            console.error('Error handling reply:', error);
-            // Handle specific errors and retries if necessary
-        }
-    }
-}
+    const refChain = [];
+    let reference = message.reference.messageId;
 
+    while (reference) {
+        const msg = await message.channel.messages.fetch(reference);
+        refChain.push(msg);
+        reference = msg.reference?.messageId;
+    }
+    let prompt = await `--- start of conversation ---\n ${refChain.map(msg => `${msg.author.username} : ${formatMentions(msg)}`).reverse().join('\n')}\n--- end of conversation ---\n\nQuery : ${message.content}\n Respond to this query in 1 to 3 short sentences. Take any context if needed from the above conversation. Do not repeat anything as it is from the conversation. Use monke slang. Do not separate answer in points. Your name is MONKE in this conversation.`;
+
+    const response = await generateFreeform(prompt);
+    await reply(message, response);
+}
 
 // Exporting the messageCreate event handler
 module.exports = {
