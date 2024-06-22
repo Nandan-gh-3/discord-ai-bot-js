@@ -7,7 +7,7 @@ module.exports = {
     async execute(message, args) {
         const guildID = message.guild.id;
         const data = JSON.parse(fs.readFileSync('data.json').toString());
-        if(args[0] === "?"){
+        if (args[0] === "?") {
             message.delete()
             const res = await message.channel.send(`Current history limit: ${data.historyLimit[guildID] || 0}`);
             setTimeout(() => {
