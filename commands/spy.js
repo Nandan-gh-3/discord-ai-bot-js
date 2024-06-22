@@ -24,6 +24,6 @@ module.exports = {
         }
         setTimeout(() => {
             message.delete();
-        }, 600);
+        }, 500);
     },
 };
