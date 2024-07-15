@@ -1,7 +1,6 @@
 // utils/gemini/geminiUtils.js
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
-const { geminiToken } = require("../../config/config.json");
-const genAI = new GoogleGenerativeAI(geminiToken);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_TOKEN);
 const model = genAI.getGenerativeModel({ model: "gemini-1.0-pro" });
 
 const generationConfig = { temperature: 0.9, topK: 1, topP: 1, maxOutputTokens: 2048 };
@@ -29,7 +28,7 @@ async function generateStructured(user, prompt, emojis, history) {
 }
 
 async function generateFreeform(prompt) {
-    console.log("\n\n",prompt ,"\n\n");
+    console.log("\n\n", prompt, "\n\n");
     const parts = [{ text: prompt }];
     const result = await model.generateContent({ contents: [{ role: "user", parts }], generationConfig, safetySettings });
     return result.response.text();

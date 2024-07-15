@@ -1,7 +1,7 @@
 // index.js
 
+require('dotenv').config();
 const { Client, Intents } = require('discord.js');
-const { discordToken } = require('./config/config.json');
 const { loadCommands, loadEvents } = require('./utils/loader');
 
 // Create a new Discord client
@@ -33,7 +33,7 @@ const client = new Client({
         }
 
         // Login to Discord
-        await client.login(discordToken);
+        await client.login(process.env.DISCORD_TOKEN);
         console.log('Bot logged in successfully.');
     } catch (error) {
         console.error('Error initializing bot:', error);

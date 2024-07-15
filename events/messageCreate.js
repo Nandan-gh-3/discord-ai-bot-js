@@ -1,7 +1,6 @@
 // events/messageCreate.js
 
 const c = require('../utils/colorUtils');
-const { prefix } = require('../config/config.json');
 const { generateStructured, generateFreeform } = require('../utils/gemini/geminiUtils');
 const { send, reply, fetchEmojis, formatMentions } = require('../utils/helperUtils');
 const fs = require('fs');
@@ -12,7 +11,7 @@ async function handleMessage(message) {
     if (message.author.bot) return;
 
     // Define handlers for different conditions
-    if (message.content.toLowerCase().startsWith(prefix)) {
+    if (message.content.toLowerCase().startsWith(process.env.PREFIX)) {
         await handleCommandMessage(message);
         return;
     }
@@ -35,7 +34,7 @@ async function handleMessage(message) {
 async function handleCommandMessage(message, client) {
     console.log("handling command");
     // Parse command and arguments
-    const args = message.content.slice(prefix.length).trim().split(/ +/);
+    const args = message.content.slice(process.env.PREFIX.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
     const command = message.client.commands.get(commandName);
 
@@ -65,7 +64,7 @@ async function handleMentionMessage(ctx) {
         const historyLimit = JSON.parse(fs.readFileSync('data.json').toString()).historyLimit || {};
         let history
         if (historyLimit[ctx.guild.id]) {
-            const messages = await ctx.channel.messages.fetch({ limit: historyLimit[ctx.guild.id]+1 });
+            const messages = await ctx.channel.messages.fetch({ limit: historyLimit[ctx.guild.id] + 1 });
             history = (await Promise.all(messages.map(async msg => (
                 // (msg.author.globalName || msg.author.username) + " : " + await formatMentions(msg)
                 (msg.author.username) + " : " + await formatMentions(msg)
@@ -76,12 +75,12 @@ async function handleMentionMessage(ctx) {
         const emojis = fetchEmojis(ctx.guild);
 
         // format the prompt according to history
-        if(history){
+        if (history) {
             prompt = `--- start of conversation ---\n${history}\n--- end of conversation ---\n\nQuery - ${prompt}\n Respond to this query in 1 to 3 short sentences. Take any context if needed from the above conversation. Do not repeat anything as it is from the conversation. Use monke slang. Do not separate answer in points. Your name is MONKE in this conversation.`;
         }
 
         //format the prompt if there is no history
-        if(!history){
+        if (!history) {
             prompt = `${prompt}\n Respond to this query in short. Do not repeat anything. Use monke slang. Do not separate answer in points.`
         }
 
