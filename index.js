@@ -3,6 +3,7 @@
 require('dotenv').config();
 const { Client, Intents } = require('discord.js');
 const { loadCommands, loadEvents } = require('./utils/loader');
+const http = require('http');
 
 // Create a new Discord client
 const client = new Client({
@@ -17,6 +18,19 @@ const client = new Client({
         Intents.FLAGS.GUILD_VOICE_STATES,
         Intents.FLAGS.GUILD_INVITES
     ]
+});
+
+// Create a dummy HTTP server
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('This is a Discord bot, not a web server.');
+});
+
+const PORT = process.env.PORT || 3000;
+
+// Start the dummy HTTP server
+server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
 
 // Asynchronous function to initialize the bot
